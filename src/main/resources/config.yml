@@ -1,0 +1,20 @@
+# Need help or want support? Join the Discord: https://discord.gg/kEF77QCfu7
+
+# FoAntiDupe configuration
+#
+# Flag rules live in flag-rules.yml. By default FoAntiDupe does not cancel
+# gameplay actions; it sends alerts to players with foantidupe.show,
+# foantidupe.showonly, or foantidupe.admin.
+
+settings:
+  alert-cooldown-seconds: 5
+  scan-delay-ticks: 1
+  notify-console: true
+
+checks:
+  inventory-click: true
+  inventory-drag: true
+  item-pickup: true
+  item-drop: true
+  craft: true
+  player-join: true

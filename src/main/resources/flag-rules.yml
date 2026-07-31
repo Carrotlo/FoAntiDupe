@@ -1,0 +1,121 @@
+rules:
+  diamond_block_stack:
+    display-name: "Diamond block stack"
+    enabled: true
+    material: DIAMOND_BLOCK
+    flag-at-amount: 64
+    flag-at-drop-amount: 16
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  netherite_block_stash:
+    display-name: "Netherite block stash"
+    enabled: true
+    material: NETHERITE_BLOCK
+    flag-at-amount: 4
+    flag-at-drop-amount: 2
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  ancient_debris_stack:
+    display-name: "Ancient debris stack"
+    enabled: true
+    material: ANCIENT_DEBRIS
+    flag-at-amount: 64
+    flag-at-drop-amount: 16
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  netherite_scrap_stash:
+    display-name: "Netherite scrap stash"
+    enabled: true
+    material: NETHERITE_SCRAP
+    flag-at-amount: 64
+    flag-at-drop-amount: 16
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  diamond_overflow:
+    display-name: "Diamond overflow"
+    enabled: true
+    material: DIAMOND
+    flag-at-amount: 128
+    flag-at-drop-amount: 32
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  netherite_overflow:
+    display-name: "Netherite overflow"
+    enabled: true
+    material: NETHERITE_INGOT
+    flag-at-amount: 32
+    flag-at-drop-amount: 8
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  enchanted_golden_apple_overflow:
+    display-name: "Enchanted golden apple overflow"
+    enabled: true
+    material: ENCHANTED_GOLDEN_APPLE
+    flag-at-amount: 16
+    flag-at-drop-amount: 4
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false
+  shulker_box_overflow:
+    display-name: "Shulker box overflow"
+    enabled: true
+    material: SHULKER_BOX
+    flag-at-amount: 8
+    flag-at-drop-amount: 2
+    check-inventory: true
+    check-drops: true
+    exact-item: false
+    strict-meta: false
+    match:
+      name: false
+      lore: false
+      enchants: false
+      custom-model-data: false

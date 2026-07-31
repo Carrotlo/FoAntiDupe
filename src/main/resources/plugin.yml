@@ -1,0 +1,30 @@
+name: FoAntiDupe
+description: Configurable anti-dupe flagging and staff review tools.
+version: '${version}'
+
+main: me.foesio.foAntiDupe.FoAntiDupe
+api-version: '1.21'
+
+authors: [ Carrotio ]
+
+commands:
+  foantidupe:
+    description: FoAntiDupe admin command.
+    usage: /foantidupe <version|reload|editor>
+    aliases: [ fad ]
+
+permissions:
+  foantidupe.admin:
+    description: Allows use of FoAntiDupe admin commands and editor.
+    default: op
+    children:
+      foantidupe.show: true
+  foantidupe.show:
+    description: Shows FoAntiDupe player flag alerts and opens editable live inventories.
+    default: op
+  foantidupe.showonly:
+    description: Shows FoAntiDupe player flag alerts and opens read-only live inventories.
+    default: false
+  foantidupe.bypass:
+    description: Bypasses FoAntiDupe checks.
+    default: false
