@@ -1,5 +1,6 @@
 package me.foesio.foAntiDupe;
 
+import me.foesio.core.dialog.DialogButton;
 import me.foesio.core.dialog.TextDialogRequest;
 import me.foesio.core.editor.ConfigEditorButton;
 import me.foesio.core.editor.ConfigEditorMenu;
@@ -9,6 +10,10 @@ import me.foesio.core.editor.EditorMenuHolder;
 import me.foesio.core.editor.EditorSaveResult;
 import me.foesio.core.gui.GuiButtonConfig;
 import me.foesio.core.gui.GuiSlots;
+import me.foesio.core.gui.EntryBrowserClick;
+import me.foesio.core.gui.EntryBrowserHolder;
+import me.foesio.core.gui.EntryBrowserMenus;
+import me.foesio.core.gui.EntryBrowserRequest;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.number.LargeNumberParser;
 import me.foesio.core.reload.FoReloadResult;
@@ -20,6 +25,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -36,26 +42,13 @@ import java.util.function.ObjIntConsumer;
 
 public final class EditorManager implements Listener {
 
-    private static final int[] RULE_SLOTS = {
-            10, 11, 12, 13, 14, 15, 16,
-            19, 20, 21, 22, 23, 24, 25,
-            28, 29, 30, 31, 32, 33, 34,
-            37, 38, 39, 40, 41, 42, 43
-    };
-
     private static final String SETTINGS_MENU_ID = "foantidupe-settings";
-    private static final int BROWSER_ROWS = 6;
-    private static final int BROWSER_PREVIOUS_SLOT = 45;
-    private static final int BROWSER_BACK_SLOT = GuiSlots.bottomMiddleSlot(BROWSER_ROWS);
-    private static final int BROWSER_ADD_RULE_SLOT = 50;
-    private static final int BROWSER_NEXT_SLOT = 53;
     private static final int RULE_EDITOR_ROWS = 5;
     private static final int RULE_EDITOR_BACK_SLOT = GuiSlots.bottomMiddleSlot(RULE_EDITOR_ROWS);
     private static final int SETTINGS_ROWS = 4;
     private static final int SETTINGS_BACK_SLOT = GuiSlots.bottomMiddleSlot(SETTINGS_ROWS);
     private static final Material EDITOR_FILLER_MATERIAL = Material.GRAY_STAINED_GLASS_PANE;
     private static final String MAIN_TITLE = "&8ꜰᴏᴀɴᴛɪᴅᴜᴘᴇ";
-    private static final String RULES_TITLE = "&8ꜰʟᴀɢ ʀᴜʟᴇꜱ";
     private static final String RULE_EDITOR_TITLE = "&8ʀᴜʟᴇ ᴇᴅɪᴛᴏʀ";
     private static final String SETTINGS_TITLE = "&8ꜱᴇᴛᴛɪɴɢꜱ";
 
@@ -91,33 +84,37 @@ public final class EditorManager implements Listener {
     }
 
     private void openRuleBrowser(Player player, int page) {
-        List<DupeRule> sortedRules = rules.sortedRules();
-        int maxPage = Math.max(0, (sortedRules.size() - 1) / RULE_SLOTS.length);
-        int safePage = Math.max(0, Math.min(page, maxPage));
+        openRuleBrowser(player, page, "");
+    }
 
-        EditorHolder holder = new EditorHolder(EditorView.RULE_BROWSER, null, safePage);
-        Inventory inventory = createInventory(holder, 54, title(RULES_TITLE));
-        int offset = safePage * RULE_SLOTS.length;
-        for (int i = 0; i < RULE_SLOTS.length; i++) {
-            int ruleIndex = offset + i;
-            if (ruleIndex >= sortedRules.size()) {
-                break;
-            }
-            inventory.setItem(RULE_SLOTS[i], ruleIcon(sortedRules.get(ruleIndex)));
-        }
+    private void openRuleBrowser(Player player, int page, String query) {
+        String normalizedQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
+        List<EntryBrowserRequest.Entry> entries = rules.sortedRules().stream()
+                .filter(rule -> matchesRuleSearch(rule, normalizedQuery))
+                .map(rule -> EntryBrowserRequest.Entry.of(rule.id(), ruleIcon(rule)))
+                .toList();
+        EntryBrowserMenus.open(player, EntryBrowserRequest.builder()
+                .title("Flag Rules")
+                .entries(entries)
+                .page(page)
+                .filter(normalizedQuery)
+                .buttons(buttons)
+                .showBack(true)
+                .addButton(icon(Material.ANVIL, "{good}Add held item", List.of(
+                        "{white}Hold an item on your cursor.",
+                        "{white}Click here to create a rule."
+                )))
+                .build());
+    }
 
-        if (safePage > 0) {
-            inventory.setItem(BROWSER_PREVIOUS_SLOT, buttons.previousPage(safePage, maxPage));
+    private boolean matchesRuleSearch(DupeRule rule, String query) {
+        if (query.isBlank()) {
+            return true;
         }
-        inventory.setItem(BROWSER_BACK_SLOT, buttons.back());
-        inventory.setItem(BROWSER_ADD_RULE_SLOT, icon(Material.LIME_DYE, "{good}Add held item", List.of(
-                "{white}Hold an item on your cursor.",
-                "{white}Click here to create a rule."
-        )));
-        if (safePage < maxPage) {
-            inventory.setItem(BROWSER_NEXT_SLOT, buttons.nextPage(safePage, maxPage));
-        }
-        player.openInventory(inventory);
+        String normalized = query.toLowerCase(java.util.Locale.ROOT);
+        return rule.id().toLowerCase(java.util.Locale.ROOT).contains(normalized)
+                || rule.displayName().toLowerCase(java.util.Locale.ROOT).contains(normalized)
+                || rule.materialLabel().toLowerCase(java.util.Locale.ROOT).contains(normalized);
     }
 
     private void openRuleEditor(Player player, String ruleId) {
@@ -176,13 +173,20 @@ public final class EditorManager implements Listener {
             return;
         }
 
+        if (topInventory.getHolder() instanceof EntryBrowserHolder entryBrowserHolder) {
+            if (!prepareTopInventoryClick(event, topInventory)) {
+                return;
+            }
+            handleEntryBrowserClick(player, event, entryBrowserHolder);
+            return;
+        }
+
         if (topInventory.getHolder() instanceof EditorHolder holder) {
             if (!prepareTopInventoryClick(event, topInventory)) {
                 return;
             }
             switch (holder.view) {
                 case MAIN -> handleMainClick(player, event.getSlot());
-                case RULE_BROWSER -> handleBrowserClick(player, holder.page, event.getSlot(), event.getClick(), event.getCursor());
                 case RULE_EDITOR -> handleRuleEditorClick(player, holder.ruleId, event.getSlot(), event.getClick(), event.getCursor(), event.isShiftClick());
             }
             return;
@@ -193,6 +197,20 @@ public final class EditorManager implements Listener {
                 return;
             }
             handleSettingsClick(player, holder, event.getSlot());
+        }
+    }
+
+    @EventHandler
+    public void onDrag(InventoryDragEvent event) {
+        Inventory topInventory = event.getView().getTopInventory();
+        if (!(topInventory.getHolder() instanceof EntryBrowserHolder)) {
+            return;
+        }
+        for (int rawSlot : event.getRawSlots()) {
+            if (rawSlot >= 0 && rawSlot < topInventory.getSize()) {
+                event.setCancelled(true);
+                return;
+            }
         }
     }
 
@@ -224,46 +242,60 @@ public final class EditorManager implements Listener {
         }
     }
 
-    private void handleBrowserClick(Player player, int page, int slot, ClickType click, ItemStack cursor) {
-        if (slot == BROWSER_PREVIOUS_SLOT && page > 0) {
-            openRuleBrowser(player, page - 1);
-            return;
-        }
-        if (slot == BROWSER_BACK_SLOT) {
-            openMain(player);
-            return;
-        }
-        if (slot == BROWSER_NEXT_SLOT && page < maxRulePage()) {
-            openRuleBrowser(player, page + 1);
-            return;
-        }
-        if (slot == BROWSER_ADD_RULE_SLOT) {
-            if (cursor == null || cursor.getType().isAir()) {
-                messages.send(player, "editor.hold-item", "{prefix}{bad}Hold an item on your cursor first{muted}.");
-                return;
+    private void handleEntryBrowserClick(Player player, InventoryClickEvent event, EntryBrowserHolder holder) {
+        EntryBrowserRequest request = holder.request();
+        EntryBrowserClick click = EntryBrowserMenus.handleClick(event.getSlot(), holder);
+        switch (click.action()) {
+            case ENTRY -> {
+                DupeRule rule = rules.get(click.entryId());
+                if (rule == null) {
+                    openRuleBrowser(player, request.page(), request.filter());
+                    return;
+                }
+                if (event.getClick().isRightClick()) {
+                    rule.enabled(!rule.enabled());
+                    saveAndReopenBrowser(player, rule, request.page(), request.filter(), "enabled");
+                    return;
+                }
+                openRuleEditor(player, rule.id());
             }
-            String id = rules.createRuleFromItem(cursor);
-            messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", rules.get(id).displayName()));
-            openRuleEditor(player, id);
-            return;
+            case ADD -> {
+                ItemStack cursor = event.getCursor();
+                if (cursor == null || cursor.getType().isAir()) {
+                    messages.send(player, "editor.hold-item", "{prefix}{bad}Hold an item on your cursor first{muted}.");
+                    return;
+                }
+                String id = rules.createRuleFromItem(cursor);
+                messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", rules.get(id).displayName()));
+                openRuleEditor(player, id);
+            }
+            case BACK -> openMain(player);
+            case SEARCH -> {
+                TextDialogRequest searchRequest = new TextDialogRequest(
+                        "Search",
+                        List.of("Search by rule id, display name, or material."),
+                        "Search",
+                        request.filter(),
+                        "rule id, name, or material",
+                        DialogButton.search(),
+                        DialogButton.cancel("Back"),
+                        320,
+                        300,
+                        64,
+                        true,
+                        true,
+                        false
+                );
+                openTextInputFromInventory(player, searchRequest,
+                        input -> openRuleBrowser(player, 0, input),
+                        () -> openRuleBrowser(player, request.page(), request.filter()));
+            }
+            case CLEAR_SEARCH -> openRuleBrowser(player, 0, "");
+            case PREVIOUS_PAGE -> openRuleBrowser(player, request.page() - 1, request.filter());
+            case NEXT_PAGE -> openRuleBrowser(player, request.page() + 1, request.filter());
+            case NONE -> {
+            }
         }
-
-        int slotIndex = indexOfRuleSlot(slot);
-        if (slotIndex < 0) {
-            return;
-        }
-        int ruleIndex = page * RULE_SLOTS.length + slotIndex;
-        List<DupeRule> sortedRules = rules.sortedRules();
-        if (ruleIndex >= sortedRules.size()) {
-            return;
-        }
-        DupeRule rule = sortedRules.get(ruleIndex);
-        if (click.isRightClick()) {
-            rule.enabled(!rule.enabled());
-            saveAndReopenBrowser(player, rule, page, "enabled");
-            return;
-        }
-        openRuleEditor(player, rule.id());
     }
 
     private void handleRuleEditorClick(Player player, String ruleId, int slot, ClickType click, ItemStack cursor, boolean shiftClick) {
@@ -460,10 +492,10 @@ public final class EditorManager implements Listener {
         openRuleEditor(player, rule.id());
     }
 
-    private void saveAndReopenBrowser(Player player, DupeRule rule, int page, String setting) {
+    private void saveAndReopenBrowser(Player player, DupeRule rule, int page, String query, String setting) {
         rules.saveRule(rule);
         messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", setting));
-        openRuleBrowser(player, page);
+        openRuleBrowser(player, page, query);
     }
 
     private Inventory createInventory(EditorHolder holder, int size, String title) {
@@ -640,23 +672,8 @@ public final class EditorManager implements Listener {
                 ));
     }
 
-    private int indexOfRuleSlot(int slot) {
-        for (int i = 0; i < RULE_SLOTS.length; i++) {
-            if (RULE_SLOTS[i] == slot) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    private int maxRulePage() {
-        int ruleCount = rules.sortedRules().size();
-        return ruleCount == 0 ? 0 : (ruleCount - 1) / RULE_SLOTS.length;
-    }
-
     private enum EditorView {
         MAIN,
-        RULE_BROWSER,
         RULE_EDITOR
     }
 
