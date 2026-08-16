@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
 public final class DupeRule {
 
@@ -120,6 +121,12 @@ public final class DupeRule {
         return capAmount(countNested(itemStack, 0));
     }
 
+    static void visitInventoryItems(ItemStack[] contents, BiConsumer<ItemStack, Integer> visitor) {
+        for (ItemStack content : contents) {
+            visitItem(content, 1L, 0, visitor);
+        }
+    }
+
     private long countNested(ItemStack itemStack, int depth) {
         if (itemStack == null || itemStack.getType().isAir()) {
             return 0L;
@@ -140,7 +147,23 @@ public final class DupeRule {
         return amount;
     }
 
-    private List<ItemStack> nestedItems(ItemStack itemStack) {
+    private static void visitItem(ItemStack itemStack, long multiplier, int depth, BiConsumer<ItemStack, Integer> visitor) {
+        if (itemStack == null || itemStack.getType().isAir()) {
+            return;
+        }
+
+        long amount = Math.min(Integer.MAX_VALUE, multiplier * itemStack.getAmount());
+        visitor.accept(itemStack, (int) amount);
+        if (depth >= MAX_CONTAINER_DEPTH) {
+            return;
+        }
+        long childMultiplier = Math.min(Integer.MAX_VALUE, multiplier * Math.max(1, itemStack.getAmount()));
+        for (ItemStack nestedItem : nestedItems(itemStack)) {
+            visitItem(nestedItem, childMultiplier, depth + 1, visitor);
+        }
+    }
+
+    private static List<ItemStack> nestedItems(ItemStack itemStack) {
         ItemMeta meta = itemStack.getItemMeta();
         if (meta instanceof BundleMeta bundleMeta && bundleMeta.hasItems()) {
             return bundleMeta.getItems();

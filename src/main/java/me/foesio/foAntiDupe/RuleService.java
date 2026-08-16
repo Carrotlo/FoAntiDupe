@@ -11,6 +11,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +21,8 @@ public final class RuleService {
 
     private final ConfigStore configStore;
     private final Map<String, DupeRule> rules = new LinkedHashMap<>();
+    private final Map<Material, List<DupeRule>> inventoryRulesByMaterial = new EnumMap<>(Material.class);
+    private final Map<Material, List<DupeRule>> dropRulesByMaterial = new EnumMap<>(Material.class);
 
     public RuleService(ConfigStore configStore) {
         this.configStore = configStore;
@@ -27,6 +30,8 @@ public final class RuleService {
 
     public void reload() {
         rules.clear();
+        inventoryRulesByMaterial.clear();
+        dropRulesByMaterial.clear();
         ConfigurationSection section = configStore.flagRules().getConfigurationSection("rules");
         if (section == null) {
             return;
@@ -34,7 +39,9 @@ public final class RuleService {
         for (String id : section.getKeys(false)) {
             ConfigurationSection ruleSection = section.getConfigurationSection(id);
             if (ruleSection != null) {
-                rules.put(id, DupeRule.load(id, ruleSection));
+                DupeRule rule = DupeRule.load(id, ruleSection);
+                rules.put(id, rule);
+                indexRule(rule);
             }
         }
     }
@@ -54,12 +61,13 @@ public final class RuleService {
     }
 
     public List<FlagResult> scanInventory(ItemStack[] contents) {
+        Map<DupeRule, Integer> amounts = countMatchingItems(contents, inventoryRulesByMaterial);
         List<FlagResult> results = new ArrayList<>();
         for (DupeRule rule : rules.values()) {
             if (!rule.enabled() || !rule.checkInventory()) {
                 continue;
             }
-            int amount = rule.count(contents);
+            int amount = amounts.getOrDefault(rule, 0);
             if (amount >= rule.flagAtAmount()) {
                 String reason = "had " + amount + "x " + rule.materialLabel() + " (flags at " + rule.flagAtAmount() + ")";
                 results.add(new FlagResult(rule, reason, rule.iconItem(), amount));
@@ -69,12 +77,13 @@ public final class RuleService {
     }
 
     public List<FlagResult> scanDrop(ItemStack dropped) {
+        Map<DupeRule, Integer> amounts = countMatchingItems(new ItemStack[]{dropped}, dropRulesByMaterial);
         List<FlagResult> results = new ArrayList<>();
         for (DupeRule rule : rules.values()) {
             if (!rule.enabled() || !rule.checkDrops()) {
                 continue;
             }
-            int amount = rule.count(dropped);
+            int amount = amounts.getOrDefault(rule, 0);
             if (amount >= rule.flagAtDropAmount()) {
                 String reason = "dropped " + amount + "x " + rule.materialLabel() + " (flags at " + rule.flagAtDropAmount() + ")";
                 results.add(new FlagResult(rule, reason, FoItemStacks.cloneItem(dropped), amount));
@@ -116,6 +125,39 @@ public final class RuleService {
         rule.displayName(displayNameFor(item));
         saveRule(rule);
         return id;
+    }
+
+    private void indexRule(DupeRule rule) {
+        if (!rule.enabled()) {
+            return;
+        }
+        if (rule.checkInventory()) {
+            inventoryRulesByMaterial.computeIfAbsent(rule.material(), ignored -> new ArrayList<>()).add(rule);
+        }
+        if (rule.checkDrops()) {
+            dropRulesByMaterial.computeIfAbsent(rule.material(), ignored -> new ArrayList<>()).add(rule);
+        }
+    }
+
+    private Map<DupeRule, Integer> countMatchingItems(ItemStack[] contents, Map<Material, List<DupeRule>> rulesByMaterial) {
+        Map<DupeRule, Integer> amounts = new LinkedHashMap<>();
+        DupeRule.visitInventoryItems(contents, (item, amount) -> {
+            List<DupeRule> candidates = rulesByMaterial.get(item.getType());
+            if (candidates == null) {
+                return;
+            }
+            for (DupeRule rule : candidates) {
+                if (rule.matches(item)) {
+                    amounts.merge(rule, amount, RuleService::capAmount);
+                }
+            }
+        });
+        return amounts;
+    }
+
+    private static int capAmount(int current, int additional) {
+        long total = (long) current + additional;
+        return total >= Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) total;
     }
 
     private String uniqueBaseId(ItemStack item) {
