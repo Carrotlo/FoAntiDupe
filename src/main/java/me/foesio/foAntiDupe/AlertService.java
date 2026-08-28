@@ -2,6 +2,7 @@ package me.foesio.foAntiDupe;
 
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.logging.FoFileLogger;
+import me.foesio.core.sound.FoGuiSounds;
 import net.md_5.bungee.api.chat.BaseComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -26,14 +27,16 @@ public final class AlertService implements Listener {
     private final ConfigStore configStore;
     private final FoMessageService messages;
     private final FoFileLogger pluginLog;
+    private final FoGuiSounds guiSounds;
     private final Map<String, Long> lastAlerts = new HashMap<>();
     private final Set<UUID> readOnlyViewers = new HashSet<>();
 
-    public AlertService(FoAntiDupe plugin, ConfigStore configStore, FoMessageService messages, FoFileLogger pluginLog) {
+    public AlertService(FoAntiDupe plugin, ConfigStore configStore, FoMessageService messages, FoFileLogger pluginLog, FoGuiSounds guiSounds) {
         this.plugin = plugin;
         this.configStore = configStore;
         this.messages = messages;
         this.pluginLog = pluginLog;
+        this.guiSounds = guiSounds;
     }
 
     public void flag(Player flagged, FlagResult result) {
@@ -60,6 +63,7 @@ public final class AlertService implements Listener {
         for (Player staff : Bukkit.getOnlinePlayers()) {
             if (canViewFlags(staff)) {
                 staff.spigot().sendMessage(components);
+                plugin.sounds().play(staff, "alert.flagged");
             }
         }
         if (configStore.bool("settings.notify-console", true)) {
@@ -94,6 +98,7 @@ public final class AlertService implements Listener {
             readOnlyViewers.remove(viewer.getUniqueId());
         }
         viewer.openInventory(target.getInventory());
+        guiSounds.open(viewer);
         if (readOnly) {
             readOnlyViewers.add(viewer.getUniqueId());
         }

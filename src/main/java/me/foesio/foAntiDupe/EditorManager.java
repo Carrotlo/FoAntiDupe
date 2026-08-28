@@ -17,6 +17,7 @@ import me.foesio.core.gui.EntryBrowserRequest;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.number.LargeNumberParser;
 import me.foesio.core.reload.FoReloadResult;
+import me.foesio.core.sound.FoEditorSounds;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -56,13 +57,15 @@ public final class EditorManager implements Listener {
     private final ConfigStore configStore;
     private final FoMessageService messages;
     private final RuleService rules;
+    private final FoEditorSounds sounds;
     private final GuiButtonConfig buttons = GuiButtonConfig.defaults();
 
-    public EditorManager(FoAntiDupe plugin, ConfigStore configStore, FoMessageService messages, RuleService rules) {
+    public EditorManager(FoAntiDupe plugin, ConfigStore configStore, FoMessageService messages, RuleService rules, FoEditorSounds sounds) {
         this.plugin = plugin;
         this.configStore = configStore;
         this.messages = messages;
         this.rules = rules;
+        this.sounds = sounds;
     }
 
     public void openMain(Player player) {
@@ -231,8 +234,14 @@ public final class EditorManager implements Listener {
 
     private void handleMainClick(Player player, int slot) {
         switch (slot) {
-            case 11 -> openRuleBrowser(player, 0);
-            case 13 -> openSettings(player);
+            case 11 -> {
+                sounds.open(player);
+                openRuleBrowser(player, 0);
+            }
+            case 13 -> {
+                sounds.open(player);
+                openSettings(player);
+            }
             case 15 -> {
                 sendReloadResult(player, plugin.reloadFoAntiDupe());
                 openMain(player);
@@ -254,23 +263,31 @@ public final class EditorManager implements Listener {
                 }
                 if (event.getClick().isRightClick()) {
                     rule.enabled(!rule.enabled());
+                    sounds.toggle(player, rule.enabled());
                     saveAndReopenBrowser(player, rule, request.page(), request.filter(), "enabled");
                     return;
                 }
+                sounds.open(player);
                 openRuleEditor(player, rule.id());
             }
             case ADD -> {
                 ItemStack cursor = event.getCursor();
                 if (cursor == null || cursor.getType().isAir()) {
+                    sounds.addItemError(player);
                     messages.send(player, "editor.hold-item", "{prefix}{bad}Hold an item on your cursor first{muted}.");
                     return;
                 }
                 String id = rules.createRuleFromItem(cursor);
+                sounds.addItem(player);
                 messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", rules.get(id).displayName()));
                 openRuleEditor(player, id);
             }
-            case BACK -> openMain(player);
+            case BACK -> {
+                sounds.back(player);
+                openMain(player);
+            }
             case SEARCH -> {
+                sounds.search(player);
                 TextDialogRequest searchRequest = new TextDialogRequest(
                         "Search",
                         List.of("Search by rule id, display name, or material."),
@@ -290,9 +307,18 @@ public final class EditorManager implements Listener {
                         input -> openRuleBrowser(player, 0, input),
                         () -> openRuleBrowser(player, request.page(), request.filter()));
             }
-            case CLEAR_SEARCH -> openRuleBrowser(player, 0, "");
-            case PREVIOUS_PAGE -> openRuleBrowser(player, request.page() - 1, request.filter());
-            case NEXT_PAGE -> openRuleBrowser(player, request.page() + 1, request.filter());
+            case CLEAR_SEARCH -> {
+                sounds.clearSearch(player);
+                openRuleBrowser(player, 0, "");
+            }
+            case PREVIOUS_PAGE -> {
+                sounds.previousPage(player);
+                openRuleBrowser(player, request.page() - 1, request.filter());
+            }
+            case NEXT_PAGE -> {
+                sounds.nextPage(player);
+                openRuleBrowser(player, request.page() + 1, request.filter());
+            }
             case NONE -> {
             }
         }
@@ -305,6 +331,7 @@ public final class EditorManager implements Listener {
             return;
         }
         if (slot == RULE_EDITOR_BACK_SLOT) {
+            sounds.back(player);
             openRuleBrowser(player, 0);
             return;
         }
@@ -326,6 +353,7 @@ public final class EditorManager implements Listener {
                 if (shiftClick && click.isRightClick()) {
                     String name = rule.displayName();
                     rules.deleteRule(rule.id());
+                    sounds.delete(player);
                     messages.send(player, "editor.deleted-rule", "{prefix}{good}Deleted rule {theme}{rule}{muted}.", Map.of("rule", name));
                     openRuleBrowser(player, 0);
                 }
@@ -337,6 +365,7 @@ public final class EditorManager implements Listener {
 
     private void handleSettingsClick(Player player, EditorMenuHolder holder, int slot) {
         if (slot == SETTINGS_BACK_SLOT) {
+            sounds.back(player);
             openMain(player);
             return;
         }
@@ -366,10 +395,12 @@ public final class EditorManager implements Listener {
             rule.exactItem(false);
             rules.saveRule(rule);
             messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", "item"));
+            sounds.delete(player);
             openRuleEditor(player, rule.id());
             return;
         }
         if (cursor == null || cursor.getType().isAir()) {
+            sounds.addItemError(player);
             messages.send(player, "editor.hold-item", "{prefix}{bad}Hold an item on your cursor first{muted}.");
             return;
         }
@@ -378,6 +409,7 @@ public final class EditorManager implements Listener {
         rule.strictMeta(true);
         rules.saveRule(rule);
         messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", "item"));
+        sounds.addItem(player);
         openRuleEditor(player, rule.id());
     }
 
@@ -391,6 +423,7 @@ public final class EditorManager implements Listener {
             OptionalInt parsed = parsePositiveInteger(raw);
             if (parsed.isEmpty()) {
                 messages.send(player, "editor.invalid-number", "{prefix}{bad}Enter a whole number above zero{muted}, or type {theme}cancel{muted}.");
+                sounds.error(player);
                 openRuleEditor(player, ruleId);
                 return;
             }
@@ -401,6 +434,7 @@ public final class EditorManager implements Listener {
             setter.accept(current, parsed.getAsInt());
             rules.saveRule(current);
             messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", setting));
+            sounds.save(player);
             openRuleEditor(player, ruleId);
         }, () -> cancelAndRun(player, () -> openRuleEditor(player, ruleId)));
     }
@@ -416,6 +450,7 @@ public final class EditorManager implements Listener {
         openTextInputFromInventory(player, request, value -> {
             if (value == null || value.isBlank()) {
                 messages.send(player, "editor.invalid-text", "{prefix}{bad}Enter text{muted}, or type {theme}cancel{muted}.");
+                sounds.error(player);
                 openRuleEditor(player, ruleId);
                 return;
             }
@@ -426,6 +461,7 @@ public final class EditorManager implements Listener {
             setter.accept(current, value);
             rules.saveRule(current);
             messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", setting));
+            sounds.save(player);
             openRuleEditor(player, ruleId);
         }, () -> cancelAndRun(player, () -> openRuleEditor(player, ruleId)));
     }
@@ -471,6 +507,7 @@ public final class EditorManager implements Listener {
 
     private void handleSettingSave(Player player, ConfigEditorButton button, EditorSaveResult result) {
         if (!result.successful()) {
+            sounds.error(player);
             plugin.getLogger().warning("Failed saving editor setting " + button.configPath() + ": " + result.errorMessage());
             messages.send(player, "editor.save-failed",
                     "{prefix}{bad}Could not save {theme}{setting}{muted}: {white}{error}{muted}.",
@@ -482,12 +519,14 @@ public final class EditorManager implements Listener {
             return;
         }
         messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", button.label()));
+        sounds.save(player);
         openSettings(player);
     }
 
     private void toggleRule(Player player, DupeRule rule, BiConsumer<DupeRule, Boolean> setter, boolean value, String setting) {
         setter.accept(rule, value);
         rules.saveRule(rule);
+        sounds.toggle(player, value);
         messages.send(player, "editor.saved", "{prefix}{good}Saved {theme}{setting}{muted}.", Map.of("setting", setting));
         openRuleEditor(player, rule.id());
     }

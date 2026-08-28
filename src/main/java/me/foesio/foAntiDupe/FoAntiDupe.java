@@ -9,6 +9,10 @@ import me.foesio.core.message.FoMessageService;
 import me.foesio.core.message.FoStyle;
 import me.foesio.core.reload.FoReloadRegistry;
 import me.foesio.core.reload.FoReloadResult;
+import me.foesio.core.sound.FoAdminSounds;
+import me.foesio.core.sound.FoEditorSounds;
+import me.foesio.core.sound.FoGuiSounds;
+import me.foesio.core.sound.FoSoundService;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -23,6 +27,10 @@ public final class FoAntiDupe extends JavaPlugin {
     private EditorManager editorManager;
     private FoFileLogger pluginLogService;
     private CommandVisibilityService commandVisibilityService;
+    private FoSoundService sounds;
+    private FoAdminSounds adminSounds;
+    private FoEditorSounds editorSounds;
+    private FoGuiSounds guiSounds;
 
     @Override
     public void onEnable() {
@@ -33,14 +41,18 @@ public final class FoAntiDupe extends JavaPlugin {
         this.configStore = new ConfigStore(this);
         this.configStore.load();
         recreateCore();
+        this.sounds = core.createSounds();
+        this.adminSounds = FoAdminSounds.create(sounds);
+        this.editorSounds = FoEditorSounds.create(sounds);
+        this.guiSounds = FoGuiSounds.create(sounds);
 
         this.messageService = FoMessageService.load(this, messageMigrations());
 
         this.ruleService = new RuleService(configStore);
         this.ruleService.reload();
 
-        this.alertService = new AlertService(this, configStore, messageService, pluginLogService);
-        this.editorManager = new EditorManager(this, configStore, messageService, ruleService);
+        this.alertService = new AlertService(this, configStore, messageService, pluginLogService, guiSounds);
+        this.editorManager = new EditorManager(this, configStore, messageService, ruleService, editorSounds);
 
         getServer().getPluginManager().registerEvents(new DetectionListener(this, configStore, ruleService, alertService), this);
         getServer().getPluginManager().registerEvents(editorManager, this);
@@ -80,6 +92,7 @@ public final class FoAntiDupe extends JavaPlugin {
         FoReloadResult result = FoReloadRegistry.create()
                 .add("config", configStore::load)
                 .add("core", this::recreateCore)
+                .add("sounds", sounds::reload)
                 .addMessages(messageService)
                 .add("rules", ruleService::reload)
                 .reload();
@@ -109,6 +122,22 @@ public final class FoAntiDupe extends JavaPlugin {
 
     public FoCoreContext core() {
         return core;
+    }
+
+    public FoAdminSounds adminSounds() {
+        return adminSounds;
+    }
+
+    public FoEditorSounds editorSounds() {
+        return editorSounds;
+    }
+
+    public FoGuiSounds guiSounds() {
+        return guiSounds;
+    }
+
+    public FoSoundService sounds() {
+        return sounds;
     }
 
     private void recreateCore() {

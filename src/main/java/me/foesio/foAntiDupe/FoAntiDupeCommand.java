@@ -51,6 +51,7 @@ public final class FoAntiDupeCommand implements CommandExecutor, TabCompleter {
     private void handleInventoryView(CommandSender sender, UUID targetId) {
         if (!alerts.canViewFlags(sender)) {
             messages.send(sender, "commands.no-permission", "{prefix}{bad}No permission{muted}.");
+            plugin.adminSounds().updateError(sender);
             return;
         }
         alerts.openInventoryView(sender, targetId);
@@ -69,6 +70,7 @@ public final class FoAntiDupeCommand implements CommandExecutor, TabCompleter {
                 .commandName("foantidupe")
                 .permission("foantidupe.admin")
                 .versionCommand(false)
+                .adminSounds(plugin.adminSounds())
                 .adminMessages(FoAdminMessages.builder()
                         .generalNoPermission("commands.no-permission", "{prefix}{bad}No permission{muted}.")
                         .generalPlayerOnly("commands.player-only", "{prefix}{bad}Only players can use this{muted}.")
@@ -101,14 +103,21 @@ public final class FoAntiDupeCommand implements CommandExecutor, TabCompleter {
     private boolean handleEditor(FoAdminCommandContext context) {
         Player player = context.playerOrNull();
         plugin.pluginLog().info("Editor opened by " + player.getName() + " (" + player.getUniqueId() + ")");
+        plugin.editorSounds().open(player);
         editor.openMain(player);
         return true;
     }
 
     private void sendReloadResult(CommandSender sender, FoReloadResult result) {
         if (result.successful()) {
+            if (sender instanceof Player player) {
+                plugin.adminSounds().reload(player);
+            }
             messages.send(sender, "commands.reloaded", "{prefix}{good}Reloaded {theme}config.yml{muted}, {theme}flag-rules.yml{muted}, and {theme}messages.yml{muted}.");
             return;
+        }
+        if (sender instanceof Player player) {
+            plugin.adminSounds().reloadError(player);
         }
         messages.send(sender, "commands.reload-failed",
                 "{prefix}{bad}Reload failed at {theme}{step}{muted}: {white}{error}{muted}.",
