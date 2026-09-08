@@ -3,12 +3,12 @@ package me.foesio.foAntiDupe;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.logging.FoFileLogger;
 import me.foesio.core.sound.FoGuiSounds;
-import net.md_5.bungee.api.chat.BaseComponent;
-import net.md_5.bungee.api.chat.ClickEvent;
-import net.md_5.bungee.api.chat.TextComponent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.Material;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -48,26 +48,34 @@ public final class AlertService implements Listener {
         }
         lastAlerts.put(key, now);
 
-        Map<String, String> placeholders = Map.of(
-                "player", flagged.getName(),
-                "rule", result.rule().displayName(),
-                "reason", result.reason(),
-                "amount", String.valueOf(result.amount())
-        );
-        String alert = messages.render("flags.alert",
-                "{prefix}{bad}Flag {theme}{player}{muted} matched {theme}{rule}{muted}: {white}{reason}{muted}.",
-                placeholders);
-        String action = messages.render("flags.view-action", " {theme}[click here to view their inventory]", placeholders);
-        BaseComponent[] components = appendClickableAction(alert, action, "/foantidupe " + flagged.getUniqueId());
+        Map<String, String> placeholders = new HashMap<>();
+        placeholders.put("player", flagged.getName());
+        placeholders.put("rule", result.rule().displayName());
+        placeholders.put("reason", result.reason());
+        placeholders.put("amount", String.valueOf(result.amount()));
+        Material matchedMaterial = result.item() == null || result.item().getType().isAir()
+                ? result.rule().material()
+                : result.item().getType();
+        Map<String, String> materialPlaceholders = FoMessageService.materialPlaceholders(matchedMaterial);
+        placeholders.put("item", materialPlaceholders.get("material"));
+        placeholders.put("item_sprite", materialPlaceholders.get("material_sprite"));
+
+        String alertFallback = "{prefix}{bad}Flag {theme}{player}{muted} matched "
+                + "{white}{item_sprite}{item}{muted} {theme}{rule}{muted}: "
+                + "{white}{reason}{muted}.";
+        String actionFallback = " {theme}[click here to view their inventory]";
+        String command = "/foantidupe " + flagged.getUniqueId();
 
         for (Player staff : Bukkit.getOnlinePlayers()) {
             if (canViewFlags(staff)) {
-                staff.spigot().sendMessage(components);
+                Component alert = messages.renderComponent(staff, "flags.alert", alertFallback, placeholders);
+                Component action = messages.renderComponent(staff, "flags.view-action", actionFallback, placeholders);
+                staff.sendMessage(alert.append(withClickEvent(action, command)));
                 plugin.sounds().play(staff, "alert.flagged");
             }
         }
         if (configStore.bool("settings.notify-console", true)) {
-            Bukkit.getConsoleSender().sendMessage(alert);
+            Bukkit.getConsoleSender().sendMessage(messages.render("flags.alert", alertFallback, placeholders));
         }
         pluginLog.info("Flagged " + flagged.getName()
                 + " (" + flagged.getUniqueId() + ")"
@@ -149,17 +157,16 @@ public final class AlertService implements Listener {
         readOnlyViewers.remove(player.getUniqueId());
     }
 
-    private BaseComponent[] appendClickableAction(String alert, String action, String command) {
-        BaseComponent[] alertParts = TextComponent.fromLegacyText(alert);
-        BaseComponent[] actionParts = TextComponent.fromLegacyText(action);
-        ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.RUN_COMMAND, command);
-        for (BaseComponent component : actionParts) {
-            component.setClickEvent(clickEvent);
-        }
+    private Component withClickEvent(Component component, String command) {
+        ClickEvent clickEvent = ClickEvent.runCommand(command);
+        return applyClickEvent(component, clickEvent);
+    }
 
-        BaseComponent[] combined = new BaseComponent[alertParts.length + actionParts.length];
-        System.arraycopy(alertParts, 0, combined, 0, alertParts.length);
-        System.arraycopy(actionParts, 0, combined, alertParts.length, actionParts.length);
-        return combined;
+    private Component applyClickEvent(Component component, ClickEvent clickEvent) {
+        return component
+                .children(component.children().stream()
+                        .map(child -> applyClickEvent(child, clickEvent))
+                        .toList())
+                .clickEvent(clickEvent);
     }
 }

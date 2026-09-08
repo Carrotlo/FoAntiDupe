@@ -1,5 +1,7 @@
+# Edit optional item icons here. Remove any :icon: token to hide it.
+# Unsupported servers, older Java clients, and Bedrock players automatically receive clean text without item sprites.
 tokens:
-  prefix: "{theme}FoAntiDupe &8» {muted}"
+  prefix: ":barrier: {theme}FoAntiDupe &8» {muted}"
   theme: "#03fc88"
   muted: "#a7b8b0"
   white: "#ffffff"
@@ -7,27 +9,26 @@ tokens:
   bad: "#ff5d73"
 
 commands:
-  usage: "{prefix}Use {theme}/foantidupe <version|reload|editor>{muted}."
+  usage: "{prefix}:paper: Use {theme}/foantidupe <version|reload|editor>{muted}."
   no-permission: "{prefix}{bad}No permission{muted}."
   player-only: "{prefix}{bad}Only players can use this{muted}."
-  version: "{prefix}Author: {theme}{author}{muted} Version: {theme}{version}{muted}."
-  reloaded: "{prefix}{good}Reloaded {theme}config.yml{muted}, {theme}flag-rules.yml{muted}, and {theme}messages.yml{muted}."
-  reload-failed: "{prefix}{bad}Reload failed at {theme}{step}{muted}: {white}{error}{muted}."
+  reloaded: "{prefix}:emerald: {good}Reloaded {theme}config.yml{muted}, {theme}flag-rules.yml{muted}, and {theme}messages.yml{muted}."
+  reload-failed: "{prefix}:redstone: {bad}Reload failed at {theme}{step}{muted}: {white}{error}{muted}."
   command-failed: "{prefix}{bad}Command failed: {white}{error}{muted}."
 
 flags:
-  alert: "{prefix}{bad}Flag {theme}{player}{muted} matched {theme}{rule}{muted}: {white}{reason}{muted}."
+  alert: "{prefix}:redstone: {bad}Flag {theme}{player}{muted} matched {white}{item_sprite}{item}{muted} {theme}{rule}{muted}: {white}{reason}{muted}."
   view-action: " {theme}[click here to view their inventory]"
-  view-opened: "{prefix}{good}Opened {theme}{player}{muted}'s live inventory."
-  view-opened-read-only: "{prefix}{good}Opened {theme}{player}{muted}'s live inventory {white}(read-only){muted}."
+  view-opened: "{prefix}:chest: {good}Opened {theme}{player}{muted}'s live inventory."
+  view-opened-read-only: "{prefix}:chest: {good}Opened {theme}{player}{muted}'s live inventory {white}(read-only){muted}."
   view-offline: "{prefix}{bad}Player is offline{muted}; live inventory is unavailable."
   view-player-only: "{prefix}{bad}Only players can open live inventories{muted}."
 
 editor:
-  saved: "{prefix}{good}Saved {theme}{setting}{muted}."
+  saved: "{prefix}:emerald: {good}Saved {theme}{setting}{muted}."
   cancelled: "{prefix}{bad}Cancelled{muted}."
   invalid-number: "{prefix}{bad}Enter a whole number above zero{muted}, or type {theme}cancel{muted}."
   invalid-text: "{prefix}{bad}Enter text{muted}, or type {theme}cancel{muted}."
-  save-failed: "{prefix}{bad}Could not save {theme}{setting}{muted}: {white}{error}{muted}."
-  hold-item: "{prefix}{bad}Hold an item on your cursor first{muted}."
-  deleted-rule: "{prefix}{good}Deleted rule {theme}{rule}{muted}."
+  save-failed: "{prefix}:redstone: {bad}Could not save {theme}{setting}{muted}: {white}{error}{muted}."
+  hold-item: "{prefix}:paper: {bad}Hold an item on your cursor first{muted}."
+  deleted-rule: "{prefix}:lava_bucket: {good}Deleted rule {theme}{rule}{muted}."

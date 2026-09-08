@@ -6,6 +6,7 @@ import me.foesio.core.command.FoAdminMessages;
 import me.foesio.core.command.FoAdminSubcommand;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.reload.FoReloadResult;
+import me.foesio.core.update.UpdateNoticeService;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -22,13 +23,16 @@ public final class FoAntiDupeCommand implements CommandExecutor, TabCompleter {
     private final FoMessageService messages;
     private final AlertService alerts;
     private final EditorManager editor;
+    private final UpdateNoticeService updateNotices;
     private final FoAdminCommand adminCommand;
 
-    public FoAntiDupeCommand(FoAntiDupe plugin, FoMessageService messages, AlertService alerts, EditorManager editor) {
+    public FoAntiDupeCommand(FoAntiDupe plugin, FoMessageService messages, AlertService alerts, EditorManager editor,
+                             UpdateNoticeService updateNotices) {
         this.plugin = plugin;
         this.messages = messages;
         this.alerts = alerts;
         this.editor = editor;
+        this.updateNotices = updateNotices;
         this.adminCommand = createAdminCommand();
     }
 
@@ -86,12 +90,7 @@ public final class FoAntiDupeCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean handleVersion(FoAdminCommandContext context) {
-        messages.send(context.sender(), "commands.version",
-                "{prefix}Author: {theme}{author}{muted} Version: {theme}{version}{muted}.",
-                Map.of(
-                        "author", "Carrotio",
-                        "version", plugin.getDescription().getVersion()
-                ));
+        updateNotices.checkAndSendVersion(context.sender());
         return true;
     }
 

@@ -6,6 +6,7 @@ import me.foesio.core.editor.ConfigEditorButton;
 import me.foesio.core.editor.ConfigEditorMenu;
 import me.foesio.core.editor.ConfigEditorValueType;
 import me.foesio.core.editor.EditorDialogInputs;
+import me.foesio.core.editor.EditorItemFactory;
 import me.foesio.core.editor.EditorMenuHolder;
 import me.foesio.core.editor.EditorSaveResult;
 import me.foesio.core.gui.GuiButtonConfig;
@@ -14,7 +15,9 @@ import me.foesio.core.gui.EntryBrowserClick;
 import me.foesio.core.gui.EntryBrowserHolder;
 import me.foesio.core.gui.EntryBrowserMenus;
 import me.foesio.core.gui.EntryBrowserRequest;
+import me.foesio.core.material.MaterialTypes;
 import me.foesio.core.message.FoMessageService;
+import me.foesio.core.message.FoStyle;
 import me.foesio.core.number.LargeNumberParser;
 import me.foesio.core.reload.FoReloadResult;
 import me.foesio.core.sound.FoEditorSounds;
@@ -30,9 +33,7 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,18 +72,15 @@ public final class EditorManager implements Listener {
     public void openMain(Player player) {
         EditorHolder holder = new EditorHolder(EditorView.MAIN, null, 0);
         Inventory inventory = createInventory(holder, 27, title(MAIN_TITLE));
-        inventory.setItem(11, icon(Material.CHEST, "{theme}Flag rules", List.of(
-                "{white}Browse, add, and edit item flags.",
-                "{white}Click to open."
-        )));
-        inventory.setItem(13, icon(Material.REPEATER, "{theme}Settings", List.of(
-                "{white}Edit checks, cooldowns, and alerts.",
-                "{white}Click to open."
-        )));
-        inventory.setItem(15, icon(Material.LIME_DYE, "{good}Reload", List.of(
-                "{white}Reload config and messages.",
-                "{white}Click to reload."
-        )));
+        inventory.setItem(11, EditorItemFactory.button(player, Material.CHEST, FoStyle.THEME, "Flag Rules", List.of(
+                "Browse, add, and edit item flags."
+        ), "browse flag rules"));
+        inventory.setItem(13, EditorItemFactory.button(player, Material.REPEATER, FoStyle.THEME, "Settings", List.of(
+                "Edit checks, cooldowns, and alerts."
+        ), "open settings"));
+        inventory.setItem(15, EditorItemFactory.button(player, Material.LIME_DYE, FoStyle.GOOD, "Reload", List.of(
+                "Reload config and messages."
+        ), "reload the plugin"));
         player.openInventory(inventory);
     }
 
@@ -94,7 +92,7 @@ public final class EditorManager implements Listener {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
         List<EntryBrowserRequest.Entry> entries = rules.sortedRules().stream()
                 .filter(rule -> matchesRuleSearch(rule, normalizedQuery))
-                .map(rule -> EntryBrowserRequest.Entry.of(rule.id(), ruleIcon(rule)))
+                .map(rule -> EntryBrowserRequest.Entry.of(rule.id(), ruleIcon(player, rule)))
                 .toList();
         EntryBrowserMenus.open(player, EntryBrowserRequest.builder()
                 .title("Flag Rules")
@@ -103,10 +101,10 @@ public final class EditorManager implements Listener {
                 .filter(normalizedQuery)
                 .buttons(buttons)
                 .showBack(true)
-                .addButton(icon(Material.ANVIL, "{good}Add held item", List.of(
-                        "{white}Hold an item on your cursor.",
-                        "{white}Click here to create a rule."
-                )))
+                .addButton(EditorItemFactory.button(player, Material.ANVIL, FoStyle.GOOD, "Add Held Item", List.of(
+                        "Hold an item on your cursor.",
+                        "Create a new flag rule."
+                ), "add the held item"))
                 .build());
     }
 
@@ -129,43 +127,41 @@ public final class EditorManager implements Listener {
 
         EditorHolder holder = new EditorHolder(EditorView.RULE_EDITOR, ruleId, 0);
         Inventory inventory = createInventory(holder, RULE_EDITOR_ROWS * GuiSlots.ROW_SIZE, title(RULE_EDITOR_TITLE));
-        inventory.setItem(10, toggleIcon("Rule enabled", rule.enabled(), "Click to toggle this flag rule."));
-        inventory.setItem(11, icon(Material.OAK_SIGN, "{theme}Display name", List.of(
-                "{white}Current: {theme}" + rule.displayName(),
-                "{white}Click to set in chat."
-        )));
-        inventory.setItem(12, itemSlot(rule));
-        inventory.setItem(13, toggleIcon("Inventory checks", rule.checkInventory(), "Scan inventories for this rule."));
-        inventory.setItem(14, icon(Material.PAPER, "{theme}Inventory amount", List.of(
-                "{white}Current: {theme}" + rule.flagAtAmount(),
-                "{white}Flags when inventory has this amount.",
-                "{white}Click to set in chat."
-        )));
-        inventory.setItem(15, toggleIcon("Drop checks", rule.checkDrops(), "Scan drops for this rule."));
-        inventory.setItem(16, icon(Material.DROPPER, "{theme}Drop amount", List.of(
-                "{white}Current: {theme}" + rule.flagAtDropAmount(),
-                "{white}Flags when one drop reaches this amount.",
-                "{white}Click to set in chat."
-        )));
+        inventory.setItem(10, EditorItemFactory.toggle(player, "Rule Enabled", rule.enabled()));
+        inventory.setItem(11, EditorItemFactory.button(player, Material.OAK_SIGN, FoStyle.THEME, "Display Name", List.of(
+                "Current: " + rule.displayName(),
+                "Set the name in chat."
+        ), "edit the display name"));
+        inventory.setItem(12, itemSlot(player, rule));
+        inventory.setItem(13, EditorItemFactory.toggle(player, "Inventory Checks", rule.checkInventory()));
+        inventory.setItem(14, EditorItemFactory.button(player, Material.PAPER, FoStyle.THEME, "Inventory Amount", List.of(
+                "Current: " + rule.flagAtAmount(),
+                "Flag when inventory reaches this amount."
+        ), "edit the inventory amount"));
+        inventory.setItem(15, EditorItemFactory.toggle(player, "Drop Checks", rule.checkDrops()));
+        inventory.setItem(16, EditorItemFactory.button(player, Material.DROPPER, FoStyle.THEME, "Drop Amount", List.of(
+                "Current: " + rule.flagAtDropAmount(),
+                "Flag when one drop reaches this amount."
+        ), "edit the drop amount"));
 
-        inventory.setItem(19, toggleIcon("Exact item mode", rule.exactItem(), "Use the configured item instead of material only."));
-        inventory.setItem(20, toggleIcon("Strict meta", rule.strictMeta(), "Match the whole item meta when exact item is enabled."));
-        inventory.setItem(21, toggleIcon("Match name", rule.matchName(), "Require the same custom name."));
-        inventory.setItem(22, toggleIcon("Match lore", rule.matchLore(), "Require the same lore."));
-        inventory.setItem(23, toggleIcon("Match enchants", rule.matchEnchants(), "Require the same enchants."));
-        inventory.setItem(24, toggleIcon("Match model data", rule.matchCustomModelData(), "Require the same custom model data."));
+        inventory.setItem(19, EditorItemFactory.toggle(player, "Exact Item Mode", rule.exactItem()));
+        inventory.setItem(20, EditorItemFactory.toggle(player, "Strict Meta", rule.strictMeta()));
+        inventory.setItem(21, EditorItemFactory.toggle(player, "Match Name", rule.matchName()));
+        inventory.setItem(22, EditorItemFactory.toggle(player, "Match Lore", rule.matchLore()));
+        inventory.setItem(23, EditorItemFactory.toggle(player, "Match Enchants", rule.matchEnchants()));
+        inventory.setItem(24, EditorItemFactory.toggle(player, "Match Model Data", rule.matchCustomModelData()));
 
-        inventory.setItem(31, icon(Material.RED_DYE, "{bad}Delete rule", List.of(
-                "{white}Shift-right-click to delete.",
-                "{white}This saves immediately."
-        )));
-        inventory.setItem(RULE_EDITOR_BACK_SLOT, buttons.back());
+        inventory.setItem(31, EditorItemFactory.button(player, Material.RED_DYE, FoStyle.BAD, "Delete Rule", List.of(
+                "Shift-right-click to delete.",
+                "This saves immediately."
+        ), "delete this rule"));
+        inventory.setItem(RULE_EDITOR_BACK_SLOT, buttons.back(player));
         player.openInventory(inventory);
     }
 
     private void openSettings(Player player) {
-        Inventory inventory = settingsEditor().build();
-        inventory.setItem(SETTINGS_BACK_SLOT, buttons.back());
+        Inventory inventory = settingsEditor().build(player);
+        inventory.setItem(SETTINGS_BACK_SLOT, buttons.back(player));
         player.openInventory(inventory);
     }
 
@@ -545,50 +541,33 @@ public final class EditorManager implements Listener {
     }
 
     private void fill(Inventory inventory) {
-        ItemStack filler = new ItemStack(EDITOR_FILLER_MATERIAL);
-        ItemMeta meta = filler.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(" ");
-            filler.setItemMeta(meta);
-        }
+        ItemStack filler = EditorItemFactory.filler();
         for (int i = 0; i < inventory.getSize(); i++) {
-            inventory.setItem(i, filler);
+            inventory.setItem(i, filler.clone());
         }
     }
 
-    private ItemStack ruleIcon(DupeRule rule) {
-        ItemStack item = rule.iconItem();
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(messages.renderTemplate((rule.enabled() ? "{theme}" : "{bad}") + rule.displayName(), Map.of()));
-            meta.setLore(colorLore(List.of(
-                    "{white}Status: " + state(rule.enabled()),
-                    "{white}Material: {theme}" + rule.materialLabel(),
-                    "{white}Inventory amount: {theme}" + rule.flagAtAmount(),
-                    "{white}Drop amount: {theme}" + rule.flagAtDropAmount(),
-                    "{white}Exact item: " + state(rule.exactItem()),
-                    "{white}Left-click to edit.",
-                    "{white}Right-click to toggle."
-            )));
-            item.setItemMeta(meta);
-        }
-        return item;
+    private ItemStack ruleIcon(Player player, DupeRule rule) {
+        Map<String, String> material = FoMessageService.materialPlaceholders(rule.material());
+        return EditorItemFactory.button(player, MaterialTypes.icon(rule.material()),
+                rule.enabled() ? FoStyle.GOOD : FoStyle.BAD,
+                rule.displayName(), List.of(
+                        "State: " + (rule.enabled() ? FoStyle.GOOD + "ON" : FoStyle.BAD + "OFF"),
+                        "Material: " + messages.renderTemplateForViewer(player, "%material_sprite%%material%", material),
+                        "Inventory amount: " + rule.flagAtAmount(),
+                        "Drop amount: " + rule.flagAtDropAmount(),
+                        "Exact item: " + (rule.exactItem() ? FoStyle.GOOD + "ON" : FoStyle.BAD + "OFF")
+                ), "left-click to edit or right-click to toggle");
     }
 
-    private ItemStack itemSlot(DupeRule rule) {
-        ItemStack item = rule.iconItem();
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(messages.renderTemplate("{theme}Configured item", Map.of()));
-            meta.setLore(colorLore(List.of(
-                    "{white}Material: {theme}" + rule.materialLabel(),
-                    "{white}Exact item: " + state(rule.exactItem()),
-                    "{white}Hold an item and click to set.",
-                    "{white}Right-click empty cursor to clear."
-            )));
-            item.setItemMeta(meta);
-        }
-        return item;
+    private ItemStack itemSlot(Player player, DupeRule rule) {
+        Map<String, String> material = FoMessageService.materialPlaceholders(rule.material());
+        return EditorItemFactory.button(player, Material.HOPPER, FoStyle.THEME, "Configured Item", List.of(
+                "Material: " + messages.renderTemplateForViewer(player, "%material_sprite%%material%", material),
+                "Exact item: " + (rule.exactItem() ? FoStyle.GOOD + "ON" : FoStyle.BAD + "OFF"),
+                "Hold an item and click to set.",
+                "Right-click empty cursor to clear."
+        ), "set or clear the configured item");
     }
 
     private ConfigEditorMenu settingsEditor() {
@@ -663,35 +642,6 @@ public final class EditorManager implements Listener {
         defaults.set(path + ".slot", slot);
         defaults.set(path + ".name", "{theme}" + name);
         defaults.set(path + ".lore", lore);
-    }
-
-    private ItemStack toggleIcon(String name, boolean enabled, String description) {
-        return icon(enabled ? Material.LIME_DYE : Material.RED_DYE,
-                (enabled ? "{good}" : "{bad}") + name,
-                List.of("{white}" + description, "{white}Current: " + state(enabled), "{white}Click to toggle."));
-    }
-
-    private ItemStack icon(Material material, String name, List<String> lore) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(messages.renderTemplate(name, Map.of()));
-            meta.setLore(colorLore(lore));
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
-    private List<String> colorLore(List<String> lore) {
-        List<String> colored = new ArrayList<>();
-        for (String line : lore) {
-            colored.add(messages.renderTemplate(line, Map.of()));
-        }
-        return colored;
-    }
-
-    private String state(boolean enabled) {
-        return enabled ? "{good}Enabled" : "{bad}Disabled";
     }
 
     private String title(String title) {
