@@ -1,5 +1,6 @@
 package me.foesio.foAntiDupe;
 
+import me.foesio.foAntiDupe.api.FlagType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -60,7 +61,7 @@ public final class DetectionListener implements Listener {
         }
         if (configStore.bool("checks.item-drop", true)) {
             for (FlagResult result : rules.scanDrop(event.getItemDrop().getItemStack())) {
-                alerts.flag(player, result);
+                alerts.flag(player, result, FlagType.DROP);
             }
             queueInventoryScan(player);
         }
@@ -85,20 +86,31 @@ public final class DetectionListener implements Listener {
         queuedScans.remove(event.getPlayer().getUniqueId());
     }
 
-    private void queueInventoryScan(Player player) {
-        if (isBypassed(player) || !queuedScans.add(player.getUniqueId())) {
-            return;
+    public boolean requestInventoryScan(Player player) {
+        if (!plugin.isEnabled() || !player.isOnline() || isBypassed(player)
+                || !queuedScans.add(player.getUniqueId())) {
+            return false;
         }
         long delay = Math.max(1L, configStore.integer("settings.scan-delay-ticks", 1));
-        plugin.core().scheduler().runLaterForPlayer(player, () -> {
+        try {
+            plugin.core().scheduler().runLaterForPlayer(player, () -> {
+                queuedScans.remove(player.getUniqueId());
+                if (!plugin.isEnabled() || !player.isOnline() || isBypassed(player)) {
+                    return;
+                }
+                for (FlagResult result : rules.scanInventory(player.getInventory().getContents())) {
+                    alerts.flag(player, result, FlagType.INVENTORY);
+                }
+            }, delay);
+        } catch (RuntimeException exception) {
             queuedScans.remove(player.getUniqueId());
-            if (!player.isOnline() || isBypassed(player)) {
-                return;
-            }
-            for (FlagResult result : rules.scanInventory(player.getInventory().getContents())) {
-                alerts.flag(player, result);
-            }
-        }, delay);
+            throw exception;
+        }
+        return true;
+    }
+
+    private void queueInventoryScan(Player player) {
+        requestInventoryScan(player);
     }
 
     private boolean isBypassed(Player player) {

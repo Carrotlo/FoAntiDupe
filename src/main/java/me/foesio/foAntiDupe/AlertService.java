@@ -1,5 +1,8 @@
 package me.foesio.foAntiDupe;
 
+import me.foesio.foAntiDupe.api.FlagType;
+import me.foesio.foAntiDupe.api.event.FoAntiDupeBeforeAlertEvent;
+import me.foesio.foAntiDupe.api.event.FoAntiDupeFlagEvent;
 import me.foesio.core.message.FoMessageService;
 import me.foesio.core.logging.FoFileLogger;
 import me.foesio.core.sound.FoGuiSounds;
@@ -16,10 +19,10 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class AlertService implements Listener {
 
@@ -28,8 +31,9 @@ public final class AlertService implements Listener {
     private final FoMessageService messages;
     private final FoFileLogger pluginLog;
     private final FoGuiSounds guiSounds;
-    private final Map<String, Long> lastAlerts = new HashMap<>();
-    private final Set<UUID> readOnlyViewers = new HashSet<>();
+    private final Map<String, Long> lastAlerts = new ConcurrentHashMap<>();
+    private final Set<String> inFlightAlerts = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> readOnlyViewers = ConcurrentHashMap.newKeySet();
 
     public AlertService(FoAntiDupe plugin, ConfigStore configStore, FoMessageService messages, FoFileLogger pluginLog, FoGuiSounds guiSounds) {
         this.plugin = plugin;
@@ -39,15 +43,32 @@ public final class AlertService implements Listener {
         this.guiSounds = guiSounds;
     }
 
-    public void flag(Player flagged, FlagResult result) {
+    public void flag(Player flagged, FlagResult result, FlagType type) {
         String key = flagged.getUniqueId() + ":" + result.rule().id();
-        long now = System.currentTimeMillis();
-        long last = lastAlerts.getOrDefault(key, 0L);
-        if (now - last < configStore.secondsAsMillis("settings.alert-cooldown-seconds", 5)) {
+        if (!inFlightAlerts.add(key)) {
             return;
         }
-        lastAlerts.put(key, now);
+        try {
+            long now = System.currentTimeMillis();
+            long last = lastAlerts.getOrDefault(key, 0L);
+            if (now - last < configStore.secondsAsMillis("settings.alert-cooldown-seconds", 5)) {
+                return;
+            }
+            FoAntiDupeBeforeAlertEvent before = new FoAntiDupeBeforeAlertEvent(
+                    flagged, result.snapshot(), type, result.reason(), result.item(), result.amount());
+            Bukkit.getPluginManager().callEvent(before);
+            if (before.isCancelled() || !plugin.isEnabled()) {
+                return;
+            }
+            lastAlerts.put(key, System.currentTimeMillis());
 
+            sendAlert(flagged, result, type);
+        } finally {
+            inFlightAlerts.remove(key);
+        }
+    }
+
+    private void sendAlert(Player flagged, FlagResult result, FlagType type) {
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("player", flagged.getName());
         placeholders.put("rule", result.rule().displayName());
@@ -82,6 +103,8 @@ public final class AlertService implements Listener {
                 + " rule=" + result.rule().id()
                 + " amount=" + result.amount()
                 + " reason=\"" + result.reason() + "\"");
+        Bukkit.getPluginManager().callEvent(new FoAntiDupeFlagEvent(
+                flagged, result.snapshot(), type, result.reason(), result.item(), result.amount()));
     }
 
     public void openInventoryView(CommandSender sender, UUID targetId) {

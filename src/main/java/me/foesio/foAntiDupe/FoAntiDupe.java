@@ -1,5 +1,6 @@
 package me.foesio.foAntiDupe;
 
+import me.foesio.foAntiDupe.api.FoAntiDupeApi;
 import me.foesio.core.FoCoreContext;
 import me.foesio.core.FoPluginCore;
 import me.foesio.core.command.CommandVisibilityService;
@@ -18,6 +19,7 @@ import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.ServicePriority;
 
 public final class FoAntiDupe extends JavaPlugin {
 
@@ -25,6 +27,8 @@ public final class FoAntiDupe extends JavaPlugin {
     private ConfigStore configStore;
     private FoMessageService messageService;
     private RuleService ruleService;
+    private DetectionListener detectionListener;
+    private FoAntiDupeApi apiService;
     private AlertService alertService;
     private EditorManager editorManager;
     private FoFileLogger pluginLogService;
@@ -59,7 +63,9 @@ public final class FoAntiDupe extends JavaPlugin {
         this.alertService = new AlertService(this, configStore, messageService, pluginLogService, guiSounds);
         this.editorManager = new EditorManager(this, configStore, messageService, ruleService, editorSounds);
 
-        getServer().getPluginManager().registerEvents(new DetectionListener(this, configStore, ruleService, alertService), this);
+        this.detectionListener = new DetectionListener(this, configStore, ruleService, alertService);
+        getServer().getPluginManager().registerEvents(detectionListener, this);
+        getServer().getPluginManager().registerEvents(ruleService, this);
         getServer().getPluginManager().registerEvents(editorManager, this);
         getServer().getPluginManager().registerEvents(alertService, this);
 
@@ -72,11 +78,17 @@ public final class FoAntiDupe extends JavaPlugin {
         this.commandVisibilityService = CommandVisibilityService.builder(this)
                 .hideWithout("foantidupe.admin", "foantidupe", "fad")
                 .register();
+        this.apiService = new FoAntiDupeApiService(this, detectionListener, ruleService);
+        getServer().getServicesManager().register(FoAntiDupeApi.class, apiService, this, ServicePriority.Normal);
         this.pluginLogService.info("FoAntiDupe enabled with " + ruleService.rules().size() + " rules");
     }
 
     @Override
     public void onDisable() {
+        if (apiService != null) {
+            getServer().getServicesManager().unregister(FoAntiDupeApi.class, apiService);
+            apiService = null;
+        }
         if (pluginLogService != null) {
             pluginLogService.info("FoAntiDupe disabling");
         }
